@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         ☄️拷贝漫画增强☄️
 // @namespace    http://tampermonkey.net/
-// @version      4.2
+// @version      4.3.4
 // @description  拷贝漫画去广告🚫，对日漫版漫画页进行增强：并排布局📖、图片高度自适应↕️、辅助翻页↔️、页码显示⏱、侧边目录栏📑、暗夜模式🌙，请设置即时注入模式以避免页面闪烁⚠️
 // @author       Byaidu
 // @match        *://copymanga.com/*
@@ -433,7 +433,7 @@ function imageTop(img_id_bak = 0, time=500) {
                 }
                 middle = 0;
                 if (!imageTop(img_id_bak)) {
-                    msgTips('这是第一张了', 'warning');
+                    msgTips('这是第一页', 'warning');
                 }
             }
             scrollDown = function () {
@@ -449,18 +449,18 @@ function imageTop(img_id_bak = 0, time=500) {
                 }
                 middle = 0;
                 if (!imageTop(img_id_bak)) {
-                    msgTips('这是最后一张了', 'warning');
+                    msgTips('这是最后一页了', 'warning');
                 }
             }
 
             function goAhead() {
-                msgTips('下一页', 'success');
+                msgTips('下一章', 'success');
 
                 let location_new = $('.footer>div:nth-child(4) a').attr("href");
                 if (location_new.indexOf("chapter") >= 0) {
                     location.href = location_new;
                 } else {
-                    msgTips('这是最后一页了', 'error');
+                    msgTips('这是最后一章了', 'error');
                 }
             }
 
@@ -489,24 +489,53 @@ function imageTop(img_id_bak = 0, time=500) {
                 return false;
             });
             $("body").keydown(function (event) {
-                if (event.keyCode === 38) {
-                    scrollUp();
-                } else if (event.keyCode === 40) {
-                    scrollDown();
-                } else if (event.keyCode === 37) {
-                    goBack();
-                } else if (event.keyCode === 39) {
-                    goAhead();
-                } else if (event.keyCode === 13 || event.keyCode === 70) {
-                    checkFullScreen();
-                } else if (event.keyCode === 67 || event.keyCode === 97 || event.keyCode === 96) {
-                    info_app.switch_skip();
-                }else if (event.keyCode === 88) {
-                    skipClean();
-                }else if (event.keyCode === 90) {
-                    skipClean(true);
-                }
                 console.log(event.keyCode);
+
+                switch (event.keyCode) {
+                    case 38:
+                        scrollUp();
+                        break;
+                    case 32:
+                    case 40:
+                        scrollDown();
+                        break;
+                    case 37:
+                        goBack();
+                        break;
+                    case 39:
+                        goAhead();
+                        break;
+                    case 13:
+                    case 70:
+                        checkFullScreen();
+                        break;
+                    case 67:
+                    case 96:
+                    case 97:
+                        info_app.switch_skip();
+                        break;
+                    case 88:
+                        skipClean();
+                        break;
+                    case 90:
+                        skipClean(true);
+                        break;
+                    case 76:
+                        info_app.collect();
+                        break;
+                    case 84:
+                       info_app.switch_hide_time();
+                       break;
+                    case 84:
+                        info_app.collection_status_emoji_flash();
+                        break;
+                    case 71:
+                        info_app.switch_flash_good_css();
+                        break;
+                    default:
+                        return true;
+                }
+                return false;
             });
             document.onmousedown = function (event) {
                 // 鼠标键位监听
@@ -584,7 +613,8 @@ function imageTop(img_id_bak = 0, time=500) {
 <template v-if="show"><div id="info_skip" class="info_item" @click="switch_skip" style="cursor:pointer;">{{message_skip}}</div></template></transition>
 <transition name="custom-classes-transition" enter-active-class="animate__animated animate__fadeIn" leave-active-class="animate__animated animate__fadeOut">
 <template v-if="show"><div id="info_switch" class="info_item" @click="switch_night" style="cursor:pointer;">{{message_switch}}</div></template></transition>
-<template><div id="info_count" class="info_item">{{message_count}}</div></template>
+<template><div id="info_count" class="info_item"><span v-bind:class="{hide: collection_emoji_div_hide, collection_status_emoji: collection_status_emoji, goodman:(flash_good_css && collection_status)}">{{collection_status_emoji}}</span>{{message_count}}</div>
+<div class="info_item time_class" v-bind:class="{hide: time_div_hide, goodman:flash_good_css}">{{time_str}}</div></template>
 </div>`;
             let $info = $(info);
             $("body").append($info);
@@ -598,9 +628,31 @@ position: fixed;
 color: rgba(255,255,255,.7);
 border-radius: 3px;
 }
+.collection_status_emoji{
+margin-right: 20px;
+margin-left: -5px;
+}
+.time_class{
+color: #06dfebd9;
+}
 .info_item{
 padding:5px 0px;
 width:120px;
+}
+.goodman{
+-webkit-mask-image: linear-gradient(to right, red, orange, yellow, green, cyan, blue, purple);
+background-image: linear-gradient(to right, red, orange, yellow, green, yellow, orange, red, orange, yellow, green, yellow, orange, red);
+-webkit-background-clip: text;
+-webkit-text-fill-color: transparent;
+-webkit-background-size: 200% 100%;
+animation: bgp 5s infinite linear;
+}
+.hide {
+display: none;
+}
+@-webkit-keyframes bgp {
+0%  { background-position: 0 0;}
+100% { background-position: -100% 0;}
 }`;
             GM_addStyle(info_style);
             //vue绑定右下角菜单
@@ -615,6 +667,13 @@ width:120px;
                     skip: 0,
                     insert_image_id: '',
                     pic_count: 0,
+                    prev_html_string_data: null,
+                    collection_status: null,
+                    time_str: "",
+                    time_div_hide: true,
+                    collection_emoji_div_hide: true,
+                    flash_good_css: false,
+                    http_token: null,
                 },
                 computed: {
                     message_switch: function () {
@@ -631,7 +690,13 @@ width:120px;
                     },
                     message_count: function () {
                         return this.img_id + '/' + this.pic_count
-                    }
+                    },
+                    collection_status_emoji: function () {
+                        if (this.collection_status === null) {
+                            return '';
+                        }
+                        return this.collection_status ? "🌟" : "☆"
+                    },
                 },
                 methods: {
                     switch_night: function () {
@@ -656,6 +721,14 @@ width:120px;
                         skip();
                         msgTips('📖更改跨页', 'success');
                     },
+                    switch_hide_time: function () {
+                        this.time_div_hide = !this.time_div_hide;
+                        $.cookie('right_bottom_time_switch', this.time_div_hide, {expires: 999999, path: '/'});
+                    },
+                    switch_flash_good_css: function () {
+                        this.flash_good_css = !this.flash_good_css;
+                        $.cookie('flash_good_css', this.flash_good_css, {expires: 999999, path: '/'});
+                    },
                     switch_page: function () {
                         this.page = !this.page
                         $.cookie('page_double', this.page, {expires: 999999, path: '/'});
@@ -666,7 +739,174 @@ width:120px;
                         }
                         $("html").animate({scrollTop: $("#img_" + img_id).offset().top}, 0);
                     },
-                }
+                    request: function (opt) {
+                        var url = opt.url;
+                        var type = opt.type;
+                        var data = opt.data;
+                        var success = opt.success;
+                        var error = opt.error;
+                        var headers = opt.headers;
+                        var request = new XMLHttpRequest();
+                        request.open(type, url, true);
+                        var headerName = [];
+                        var headerText = [];
+
+                        for (var i in headers) {
+                            headerName.push(i);
+                            headerText.push(headers[i]);
+                        }
+
+                        request.setRequestHeader("Content-Type", "application/x-www-form-urlencoded;charset=UTF-8");
+
+                        request.withCredentials = true; //加入这个携带cookie
+
+                        for (var _i = 0; _i < headerText.length; _i++) {
+                            request.setRequestHeader(headerName[_i], headerText[_i]);
+                        }
+
+                        var fromStr = '';
+
+                        for (var _i2 in data) {
+                            fromStr += _i2 + '=' + data[_i2] + "&";
+                        }
+
+                        fromStr = fromStr.substr(0, fromStr.length - 1);
+
+                        if (type === 'POST') {
+                            if (data) {
+                                request.send(fromStr);
+                            } else {
+                                request.send(null);
+                            }
+                        } else if (type === 'GET') {
+                            request.send(null);
+                        }
+
+                        request.onreadystatechange = function (ev) {
+                            if (request.readyState == 4) {
+                                if (request.status == 200) {
+                                    var res = JSON.parse(request.response);
+                                    success(res);
+                                } else {
+                                    var json = JSON.parse(request.response);
+                                    error(json);
+                                    msgTips(json.message, "error");
+                                }
+                            }
+                        };
+                    },
+                    getPrev: function (func) {
+                        if (info_app.prev_html_string_data === null) {
+                            var href_url = $('.comicContent-prev.list a[href]').attr('href');
+                            if (href_url !== undefined && href_url !== '') {
+                                $.get(href_url, function (res) {
+                                    info_app.prev_html_string_data = res;
+                                    func(info_app.prev_html_string_data);
+                                })
+                                return;
+                            }
+                            msgTips('当前漫画目录页面地址解析失败', 'error');
+                            return;
+                        }
+                        func(info_app.prev_html_string_data);
+                    },
+                    collect: function () {
+                        this.getPrev(function (prev_string_data) {
+                            if (info_app.collection_status === null) {
+                                info_app.collection_status = (/加入書架/.exec(prev_string_data) === null);
+                            }
+                            var checkResult = !(info_app.collection_status);
+                            var execResult = /collect\(\'([\S]+)\'\)/.exec(prev_string_data);
+                            if (execResult !== null && execResult.length > 1) {
+                                var cartoonId = execResult[1];
+                                var token = info_app.getToken();
+                                var wantToCollect = checkResult ? "1" : "0";
+
+                                if (token) {
+                                    info_app.request({
+                                        type: "POST",
+                                        url: API_URL + "/api/v2/web/collect",
+                                        headers: {
+                                            "Authorization": "Token " + token + ""
+                                        },
+                                        data: {
+                                            comic_id: cartoonId,
+                                            is_collect: wantToCollect
+                                        },
+                                        success: function success(res) {
+                                            if (checkResult) {
+                                                info_app.collection_status = true;
+                                                msgTips('加入书架成功', 'success');
+                                            } else {
+                                                info_app.collection_status = false;
+                                                msgTips('取消收藏成功', 'success');
+                                            }
+                                        },
+                                        error: function error(res) {
+                                        }
+                                    });
+                                } else {
+                                    info_app.collection_emoji_div_hide = true;
+                                    // msgTips('请在登录之后进行操作', 'error');
+                                }
+                            } else {
+                                msgTips('提取漫画ID失败', 'error');
+                            }
+                        });
+                    },
+                    getToken: function () {
+                        if (this.http_token === null) {
+                            var strCookie = document.cookie; //将多cookie切割为多个名/值对
+
+                            var arrCookie = strCookie.split("; ");
+
+                            for (var i = 0; i < arrCookie.length; i++) {
+                                var arr = arrCookie[i].split("=");
+
+                                if ("token" == arr[0]) {
+                                    this.http_token = arr[1];
+                                    return this.http_token;
+                                }
+                            }
+                            this.http_token = false;
+                        }
+
+                        return this.http_token;
+                    },
+
+                },
+                mounted () {
+                    setTimeout(function () {
+                        getImgId();
+
+                        info_app.switch_skip();
+
+                        if (info_app.getToken()) {
+                            info_app.collection_emoji_div_hide = false;
+                        }
+
+                        var right_bottom_time_switch = $.cookie('right_bottom_time_switch');
+                        var flash_good_css = $.cookie('flash_good_css');
+                        if (right_bottom_time_switch !== undefined) {
+                            info_app.time_div_hide = right_bottom_time_switch === 'true';
+                        }
+                        if (flash_good_css !== undefined) {
+                            info_app.flash_good_css = flash_good_css === 'true';
+                        }
+
+                        info_app.getPrev(function (prev_string_data) {
+                            info_app.collection_status = (/加入書架/.exec(prev_string_data) === null);
+                            msgTips('获取到当前漫画的收藏状态', 'success');
+                        });
+                    }, 1000);
+                    setInterval(function () {
+                        var now = new Date();
+                        var hh = now.getHours();
+                        var mm = now.getMinutes();
+                        var ss = now.getSeconds();
+                        info_app.time_str = (hh<10?"0"+hh:hh)+ " : "+ (mm<10?"0"+mm:mm)+ " : "+ (ss<10?"0"+ ss: ss);
+                    }, 1000);
+                },
             })
             //添加侧边目录栏
             let sidebar = `
